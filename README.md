@@ -3,11 +3,14 @@
 
 Integracja Home Assistant z systemem Librus Synergia, umożliwiająca monitorowanie ocen, wiadomości i innych danych szkolnych.
 
+> ℹ️ To jest fork [procaktomasz/LibrusSynergiaHA](https://github.com/procaktomasz/LibrusSynergiaHA). Dodaje akcję `librus_apix.otworz_wiadomosc`, która pobiera treść **jednej** wiadomości na żądanie. Dzięki temu możesz czytać wiadomości w Home Assistant, a w Librusie jako przeczytane oznaczają się tylko te, które faktycznie otworzysz. Szczegóły: [Otwieranie pojedynczej wiadomości](#-otwieranie-pojedynczej-wiadomości-w-home-assistant).
+
 ## ✨ Funkcje
 
 - 📊 **Monitoring ocen** - wszystkie oceny ze wszystkich przedmiotów
 - 📈 **Statystyki** - średnie ocen, liczba ocen, trend
 - 📧 **Wiadomości** - najnowsze wiadomości z dziennika
+- 📖 **Czytanie wiadomości w HA** - treść pojedynczej wiadomości pobierana na żądanie (akcja `librus_apix.otworz_wiadomosc`)
 - 📅 **Kalendarze** - wbudowany plan lekcji (z obsługą zastępstw!) i terminarz w HA
 - ✅ **Zadania domowe** - wsparcie dla systemowych list To-Do
 - 📢 **Ogłoszenia** - odczyt szkolnej tablicy ogłoszeń
@@ -44,14 +47,14 @@ Sensory średnich mają `state_class: measurement` — HA automatycznie rysuje d
 
 Kliknij poniższy przycisk, aby automatycznie dodać repozytorium do HACS z właściwą kategorią:
 
-[![Otwórz w HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=procaktomasz&repository=LibrusSynergiaHA&category=integration)
+[![Otwórz w HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=dmarczydlo&repository=LibrusSynergiaHA&category=integration)
 
 Lub ręcznie:
 
 1. Otwórz HACS w Home Assistant
 2. Kliknij trzy kropki (⋮) w prawym górnym rogu
 3. Wybierz **"Custom repositories"**
-4. W polu URL wpisz dokładnie: `https://github.com/procaktomasz/LibrusSynergiaHA`  
+4. W polu URL wpisz dokładnie: `https://github.com/dmarczydlo/LibrusSynergiaHA`  
    ⚠️ **Bez `.git` na końcu!**
 5. W polu **Category** wybierz: **`Integration`**  
    ⚠️ **NIE wybieraj "AppDaemon", "Plugin" ani żadnej innej opcji!**
@@ -219,6 +222,115 @@ content: |
   {% endfor %}
   {% endif %}
   {% endif %}
+```
+
+### 📖 Otwieranie pojedynczej wiadomości w Home Assistant
+
+Opcja *"Pobieraj pełną treść wiadomości"* pobiera treść **wszystkich** wiadomości przy każdym odświeżeniu, więc Librus oznacza je wszystkie jako przeczytane. Akcja `librus_apix.otworz_wiadomosc` pobiera treść tylko jednej, wybranej wiadomości. Pozostałe zostają nieprzeczytane.
+
+| Pole | Opis |
+|---|---|
+| `entity_id` | Sensor wiadomości ucznia, np. `sensor.librus_imie_nazwisko_wiadomosci` |
+| `numer` | Pozycja wiadomości na liście, `1`–`5` (1 = najnowsza) |
+
+```yaml
+action: librus_apix.otworz_wiadomosc
+data:
+  entity_id: sensor.librus_imie_nazwisko_wiadomosci
+  numer: 1
+```
+
+Po wywołaniu treść pojawia się w atrybucie `tresc` tej wiadomości (sensor odświeża się od razu, bez czekania 2 h). Treść jest trzymana w pamięci i przetrwa kolejne odświeżenia, ale znika po restarcie Home Assistant. Wtedy wystarczy otworzyć wiadomość ponownie.
+
+> ⚠️ Librus oznacza otwartą wiadomość jako przeczytaną, tak samo jak przy otwarciu jej w aplikacji. Załączników nie da się pobrać do HA, otwórz je w Librusie.
+
+#### Przykład: lista wiadomości z okienkiem (Bubble Card)
+
+Wymaga kart [button-card](https://github.com/custom-cards/button-card) i [Bubble Card](https://github.com/Clooos/Bubble-Card) (v3.2+) z HACS. Dotknięcie wiadomości otwiera okienko, a otwarcie okienka wywołuje akcję i pokazuje treść. Na telefonie okienko zajmuje całą szerokość, na komputerze ma 560 px.
+
+Wiersz listy (powtórz dla `[0]`–`[4]` i hashy `#librus-1`–`#librus-5`, najlepiej w `vertical-stack`):
+
+```yaml
+type: custom:button-card
+entity: sensor.librus_imie_nazwisko_wiadomosci
+layout: icon_name_state2nd
+show_state: true
+name: |
+  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
+      return (m.temat || '').trim(); ]]]
+state_display: |
+  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
+      return (m.nadawca || '').split(' (')[0].trim() + ' · ' + (m.data || '').slice(0, 16)
+        + (m.ma_zalacznik ? ' · 📎' : '') + (m.tresc ? ' · otwarta' : ''); ]]]
+icon: |
+  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {};
+      return m.tresc ? 'mdi:email-open-outline'
+        : (m.nieprzeczytana ? 'mdi:email-alert' : 'mdi:email-outline'); ]]]
+tap_action:
+  action: navigate
+  navigation_path: "#librus-1"
+styles:
+  card:
+    - padding: 6px 10px
+    - box-shadow: none
+    - background: none
+    - border: none
+    - border-bottom: 1px solid var(--divider-color)
+    - display: |
+        [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
+            return m.temat === 'Brak' ? 'none' : 'block'; ]]]
+  grid:
+    - grid-template-areas: '"i n" "i s"'
+    - grid-template-columns: 28px minmax(0, 1fr)
+  name:
+    - justify-self: start
+    - max-width: 100%
+    - overflow: hidden
+    - text-overflow: ellipsis
+    - white-space: nowrap
+    - font-size: 14px
+    - font-weight: |
+        [[[ const m = (entity.attributes.wiadomosci || [])[0] || {};
+            return m.nieprzeczytana ? '700' : '400'; ]]]
+  state:
+    - justify-self: start
+    - max-width: 100%
+    - overflow: hidden
+    - text-overflow: ellipsis
+    - white-space: nowrap
+    - font-size: 11px
+    - opacity: "0.7"
+  icon:
+    - width: 20px
+```
+
+Okienko z treścią (jedno na każdą pozycję, `numer` i indeks `[0]` muszą pasować do wiersza):
+
+```yaml
+type: custom:bubble-card
+card_type: pop-up
+hash: "#librus-1"
+name: Wiadomość
+icon: mdi:email-open-outline
+popup_mode: adaptive-dialog
+width_desktop: 560px
+open_action:
+  action: perform-action
+  perform_action: librus_apix.otworz_wiadomosc
+  data:
+    entity_id: sensor.librus_imie_nazwisko_wiadomosci
+    numer: 1
+cards:
+  - type: markdown
+    content: |
+      {% set m = (state_attr('sensor.librus_imie_nazwisko_wiadomosci','wiadomosci') or [])[0] | default({}, true) -%}
+      ### {{ (m.temat or '') | trim }}
+
+      <small>{{ (m.nadawca or '').split(' (')[0] | trim }} · {{ (m.data or '')[:16] }}{{ ' · 📎 załącznik (otwórz w Librusie)' if m.ma_zalacznik else '' }}</small>
+
+      ---
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}
 ```
 
 ### Karta terminarza (wszystkie zdarzenia)
@@ -549,6 +661,12 @@ MIT License - patrz [LICENSE](LICENSE)
 
 ## 📝 Historia Zmian
 
+### v2.3.1
+- `manifest.json` wskazuje na ten fork (autorzy, dokumentacja, zgłoszenia błędów).
+
+### v2.3.0
+- **Nowa akcja `librus_apix.otworz_wiadomosc`** - pobiera treść jednej wybranej wiadomości do atrybutu `tresc` sensora wiadomości. W Librusie jako przeczytana oznacza się tylko ta wiadomość. Treść jest pamiętana do restartu Home Assistant, także po kolejnych odświeżeniach.
+
 ### v2.2.1
 - **Inteligentna fuzja planu lekcji z terminarzem** - Nowy "Algorytm Wagowy" automatycznie dopasowuje sprawdziany (Terminarz) do odpowiednich przedmiotów w planie lekcji, zapobiegając błędnemu przypisywaniu (np. jeden sprawdzian na trzech przedmiotach tego samego dnia).
 - **Zabezpieczenie przed błędem SQLite 16KB w Home Assistant** - Optymalizacja objętości danych JSON (np. inteligentne ucinanie opisu po 100 znakach), chroniąca bazę Recordera przed przepełnieniem.
@@ -569,6 +687,8 @@ Szczególne podziękowania dla **@morbiasz** za wdrożenie procentowego wskaźni
 ## 👨‍💻 Autorzy i podziękowania
 
 Ten projekt to tzw. *fork* (niezależna, rozwinięta gałąź) oryginalnej integracji, której twórcą jest **[LukMaverick](https://github.com/LukMaverick/LibrusSynergiaHA)**. 
+
+To repozytorium (**[dmarczydlo/LibrusSynergiaHA](https://github.com/dmarczydlo/LibrusSynergiaHA)**) jest z kolei forkiem wersji **[procaktomasz/LibrusSynergiaHA](https://github.com/procaktomasz/LibrusSynergiaHA)**, rozszerzonym o otwieranie pojedynczych wiadomości. Cała pozostała funkcjonalność pochodzi z wersji procaktomasz.
 Pragnę gorąco podziękować pierwotnemu autorowi za stworzenie solidnego fundamentu integracji, na którym mogłem oprzeć i udostępnić społeczności moje nowości (takie jak natywne kalendarze lekcji, lista zadań domowych, przycisk odświeżania czy statystyki frekwencji).
 
 Projekt w warstwie komunikacyjnej korzysta z biblioteki [librus-apix](https://github.com/RustySnek/librus-apix) autorstwa RustySnek.
