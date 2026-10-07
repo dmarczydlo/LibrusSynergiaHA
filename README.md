@@ -244,94 +244,420 @@ Po wywołaniu treść pojawia się w atrybucie `tresc` tej wiadomości (sensor o
 
 > ⚠️ Librus oznacza otwartą wiadomość jako przeczytaną, tak samo jak przy otwarciu jej w aplikacji. Załączników nie da się pobrać do HA, otwórz je w Librusie.
 
-#### Przykład: lista wiadomości z okienkiem (Bubble Card)
+#### Gotowa karta: lista wiadomości z okienkiem (Bubble Card)
 
-Wymaga kart [button-card](https://github.com/custom-cards/button-card) i [Bubble Card](https://github.com/Clooos/Bubble-Card) (v3.2+) z HACS. Dotknięcie wiadomości otwiera okienko, a otwarcie okienka wywołuje akcję i pokazuje treść. Na telefonie okienko zajmuje całą szerokość, na komputerze ma 560 px.
+Kompletna sekcja dashboardu: nagłówek z licznikiem nieprzeczytanych, kompaktowa lista 5 ostatnich wiadomości i okienko z treścią dla każdej z nich.
 
-Wiersz listy (powtórz dla `[0]`–`[4]` i hashy `#librus-1`–`#librus-5`, najlepiej w `vertical-stack`):
+Wymagania (HACS → Frontend): [button-card](https://github.com/custom-cards/button-card) oraz [Bubble Card](https://github.com/Clooos/Bubble-Card) w wersji 3.2 lub nowszej. Dashboard musi być typu **Sekcje** (*Sections*).
 
-```yaml
-type: custom:button-card
-entity: sensor.librus_imie_nazwisko_wiadomosci
-layout: icon_name_state2nd
-show_state: true
-name: |
-  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
-      return (m.temat || '').trim(); ]]]
-state_display: |
-  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
-      return (m.nadawca || '').split(' (')[0].trim() + ' · ' + (m.data || '').slice(0, 16)
-        + (m.ma_zalacznik ? ' · 📎' : '') + (m.tresc ? ' · otwarta' : ''); ]]]
-icon: |
-  [[[ const m = (entity.attributes.wiadomosci || [])[0] || {};
-      return m.tresc ? 'mdi:email-open-outline'
-        : (m.nieprzeczytana ? 'mdi:email-alert' : 'mdi:email-outline'); ]]]
-tap_action:
-  action: navigate
-  navigation_path: "#librus-1"
-styles:
-  card:
-    - padding: 6px 10px
-    - box-shadow: none
-    - background: none
-    - border: none
-    - border-bottom: 1px solid var(--divider-color)
-    - display: |
-        [[[ const m = (entity.attributes.wiadomosci || [])[0] || {temat: 'Brak'};
-            return m.temat === 'Brak' ? 'none' : 'block'; ]]]
-  grid:
-    - grid-template-areas: '"i n" "i s"'
-    - grid-template-columns: 28px minmax(0, 1fr)
-  name:
-    - justify-self: start
-    - max-width: 100%
-    - overflow: hidden
-    - text-overflow: ellipsis
-    - white-space: nowrap
-    - font-size: 14px
-    - font-weight: |
-        [[[ const m = (entity.attributes.wiadomosci || [])[0] || {};
-            return m.nieprzeczytana ? '700' : '400'; ]]]
-  state:
-    - justify-self: start
-    - max-width: 100%
-    - overflow: hidden
-    - text-overflow: ellipsis
-    - white-space: nowrap
-    - font-size: 11px
-    - opacity: "0.7"
-  icon:
-    - width: 20px
-```
+Jak to działa:
+- 🔴 czerwona ikona i pogrubiony temat = nieprzeczytana w Librusie, 📎 = załącznik, „otwarta” = treść już pobrana do HA,
+- dotknięcie wiadomości otwiera okienko, a otwarcie okienka wywołuje `librus_apix.otworz_wiadomosc` i po kilku sekundach pokazuje treść,
+- długie tematy są skracane „…”, żeby wiersz miał stałą wysokość także na telefonie (pełny temat jest w okienku),
+- okienko na telefonie zajmuje całą szerokość, na komputerze ma 560 px,
+- przy braku wiadomości lista pokazuje jedną linię „Brak wiadomości”.
 
-Okienko z treścią (jedno na każdą pozycję, `numer` i indeks `[0]` muszą pasować do wiersza):
+Jak wkleić:
+1. Zamień w poniższym YAML-u **każde** wystąpienie `sensor.librus_imie_nazwisko_wiadomosci` na swój sensor wiadomości (Narzędzia deweloperskie → Stany, szukaj `wiadomosci`).
+2. Przy kilkorgu dzieci zamień też `#librus-` na unikalny prefiks dla każdego dziecka (np. `#librus-jan-`), inaczej okienka będą się nakładać.
+3. W dashboardzie: **Edytuj** → **Dodaj sekcję** → przy nowej sekcji ⋮ → **Edytuj w YAML** → wklej całość → **Zapisz**.
+
+<details>
+<summary><b>Pokaż YAML sekcji (lista + 5 okienek)</b></summary>
 
 ```yaml
-type: custom:bubble-card
-card_type: pop-up
-hash: "#librus-1"
-name: Wiadomość
-icon: mdi:email-open-outline
-popup_mode: adaptive-dialog
-width_desktop: 560px
-open_action:
-  action: perform-action
-  perform_action: librus_apix.otworz_wiadomosc
-  data:
-    entity_id: sensor.librus_imie_nazwisko_wiadomosci
-    numer: 1
+type: grid
 cards:
+- type: heading
+  heading: Wiadomości
+  heading_style: subtitle
+  icon: mdi:email-outline
+  badges:
+  - type: entity
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    show_state: true
+    icon: mdi:email-alert
+- type: vertical-stack
+  grid_options:
+    columns: full
+  cards:
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    layout: icon_name_state2nd
+    show_state: true
+    name: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return (m.temat || '''').trim(); ]]]'
+    state_display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return (m.nadawca || '''').split('' ('')[0].trim() + '' · '' + (m.data || '''').slice(0, 16) + (m.ma_zalacznik ? '' · 📎'' : '''') + (m.tresc ? '' · otwarta'' : ''''); ]]]'
+    icon: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return m.tresc ? ''mdi:email-open-outline'' : (m.nieprzeczytana ? ''mdi:email-alert'' : ''mdi:email-outline''); ]]]'
+    tap_action:
+      action: navigate
+      navigation_path: '#librus-1'
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 6px 10px
+      - border-radius: '0'
+      - box-shadow: none
+      - background: none
+      - border: none
+      - border-bottom: 1px solid var(--divider-color)
+      - display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return m.temat === ''Brak'' ? ''none'' : ''block''; ]]]'
+      grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: 28px minmax(0, 1fr)
+      - column-gap: 8px
+      name:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 14px
+      - font-weight: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return m.nieprzeczytana ? ''700'' : ''400''; ]]]'
+      state:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 11px
+      - opacity: '0.7'
+      img_cell:
+      - width: 28px
+      - height: 28px
+      icon:
+      - width: 20px
+      - color: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[0] || {temat: ''Brak''}; return m.nieprzeczytana ? ''var(--red-color)'' : ''var(--secondary-text-color)''; ]]]'
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    layout: icon_name_state2nd
+    show_state: true
+    name: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return (m.temat || '''').trim(); ]]]'
+    state_display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return (m.nadawca || '''').split('' ('')[0].trim() + '' · '' + (m.data || '''').slice(0, 16) + (m.ma_zalacznik ? '' · 📎'' : '''') + (m.tresc ? '' · otwarta'' : ''''); ]]]'
+    icon: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return m.tresc ? ''mdi:email-open-outline'' : (m.nieprzeczytana ? ''mdi:email-alert'' : ''mdi:email-outline''); ]]]'
+    tap_action:
+      action: navigate
+      navigation_path: '#librus-2'
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 6px 10px
+      - border-radius: '0'
+      - box-shadow: none
+      - background: none
+      - border: none
+      - border-bottom: 1px solid var(--divider-color)
+      - display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return m.temat === ''Brak'' ? ''none'' : ''block''; ]]]'
+      grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: 28px minmax(0, 1fr)
+      - column-gap: 8px
+      name:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 14px
+      - font-weight: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return m.nieprzeczytana ? ''700'' : ''400''; ]]]'
+      state:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 11px
+      - opacity: '0.7'
+      img_cell:
+      - width: 28px
+      - height: 28px
+      icon:
+      - width: 20px
+      - color: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[1] || {temat: ''Brak''}; return m.nieprzeczytana ? ''var(--red-color)'' : ''var(--secondary-text-color)''; ]]]'
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    layout: icon_name_state2nd
+    show_state: true
+    name: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return (m.temat || '''').trim(); ]]]'
+    state_display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return (m.nadawca || '''').split('' ('')[0].trim() + '' · '' + (m.data || '''').slice(0, 16) + (m.ma_zalacznik ? '' · 📎'' : '''') + (m.tresc ? '' · otwarta'' : ''''); ]]]'
+    icon: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return m.tresc ? ''mdi:email-open-outline'' : (m.nieprzeczytana ? ''mdi:email-alert'' : ''mdi:email-outline''); ]]]'
+    tap_action:
+      action: navigate
+      navigation_path: '#librus-3'
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 6px 10px
+      - border-radius: '0'
+      - box-shadow: none
+      - background: none
+      - border: none
+      - border-bottom: 1px solid var(--divider-color)
+      - display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return m.temat === ''Brak'' ? ''none'' : ''block''; ]]]'
+      grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: 28px minmax(0, 1fr)
+      - column-gap: 8px
+      name:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 14px
+      - font-weight: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return m.nieprzeczytana ? ''700'' : ''400''; ]]]'
+      state:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 11px
+      - opacity: '0.7'
+      img_cell:
+      - width: 28px
+      - height: 28px
+      icon:
+      - width: 20px
+      - color: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[2] || {temat: ''Brak''}; return m.nieprzeczytana ? ''var(--red-color)'' : ''var(--secondary-text-color)''; ]]]'
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    layout: icon_name_state2nd
+    show_state: true
+    name: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return (m.temat || '''').trim(); ]]]'
+    state_display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return (m.nadawca || '''').split('' ('')[0].trim() + '' · '' + (m.data || '''').slice(0, 16) + (m.ma_zalacznik ? '' · 📎'' : '''') + (m.tresc ? '' · otwarta'' : ''''); ]]]'
+    icon: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return m.tresc ? ''mdi:email-open-outline'' : (m.nieprzeczytana ? ''mdi:email-alert'' : ''mdi:email-outline''); ]]]'
+    tap_action:
+      action: navigate
+      navigation_path: '#librus-4'
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 6px 10px
+      - border-radius: '0'
+      - box-shadow: none
+      - background: none
+      - border: none
+      - border-bottom: 1px solid var(--divider-color)
+      - display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return m.temat === ''Brak'' ? ''none'' : ''block''; ]]]'
+      grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: 28px minmax(0, 1fr)
+      - column-gap: 8px
+      name:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 14px
+      - font-weight: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return m.nieprzeczytana ? ''700'' : ''400''; ]]]'
+      state:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 11px
+      - opacity: '0.7'
+      img_cell:
+      - width: 28px
+      - height: 28px
+      icon:
+      - width: 20px
+      - color: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[3] || {temat: ''Brak''}; return m.nieprzeczytana ? ''var(--red-color)'' : ''var(--secondary-text-color)''; ]]]'
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    layout: icon_name_state2nd
+    show_state: true
+    name: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return (m.temat || '''').trim(); ]]]'
+    state_display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return (m.nadawca || '''').split('' ('')[0].trim() + '' · '' + (m.data || '''').slice(0, 16) + (m.ma_zalacznik ? '' · 📎'' : '''') + (m.tresc ? '' · otwarta'' : ''''); ]]]'
+    icon: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return m.tresc ? ''mdi:email-open-outline'' : (m.nieprzeczytana ? ''mdi:email-alert'' : ''mdi:email-outline''); ]]]'
+    tap_action:
+      action: navigate
+      navigation_path: '#librus-5'
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 6px 10px
+      - border-radius: '0'
+      - box-shadow: none
+      - background: none
+      - border: none
+      - border-bottom: 1px solid var(--divider-color)
+      - display: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return m.temat === ''Brak'' ? ''none'' : ''block''; ]]]'
+      grid:
+      - grid-template-areas: '"i n" "i s"'
+      - grid-template-columns: 28px minmax(0, 1fr)
+      - column-gap: 8px
+      name:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 14px
+      - font-weight: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return m.nieprzeczytana ? ''700'' : ''400''; ]]]'
+      state:
+      - justify-self: start
+      - max-width: 100%
+      - overflow: hidden
+      - text-overflow: ellipsis
+      - white-space: nowrap
+      - font-size: 11px
+      - opacity: '0.7'
+      img_cell:
+      - width: 28px
+      - height: 28px
+      icon:
+      - width: 20px
+      - color: '[[[ const m = (states[''sensor.librus_imie_nazwisko_wiadomosci''].attributes.wiadomosci || [])[4] || {temat: ''Brak''}; return m.nieprzeczytana ? ''var(--red-color)'' : ''var(--secondary-text-color)''; ]]]'
+  - type: custom:button-card
+    entity: sensor.librus_imie_nazwisko_wiadomosci
+    name: Brak wiadomości
+    show_icon: false
+    tap_action:
+      action: none
+    hold_action:
+      action: none
+    styles:
+      card:
+      - padding: 8px 10px
+      - background: none
+      - box-shadow: none
+      - border: none
+      - display: '[[[ return (entity.attributes.wiadomosci || []).some(m => m.temat !== ''Brak'') ? ''none'' : ''block''; ]]]'
+      name:
+      - justify-self: start
+      - font-size: 13px
+      - opacity: '0.6'
+- type: custom:bubble-card
+  card_type: pop-up
+  hash: '#librus-1'
+  name: Wiadomość
+  icon: mdi:email-open-outline
+  popup_mode: adaptive-dialog
+  width_desktop: 560px
+  open_action:
+    action: perform-action
+    perform_action: librus_apix.otworz_wiadomosc
+    data:
+      entity_id: sensor.librus_imie_nazwisko_wiadomosci
+      numer: 1
+  cards:
   - type: markdown
-    content: |
-      {% set m = (state_attr('sensor.librus_imie_nazwisko_wiadomosci','wiadomosci') or [])[0] | default({}, true) -%}
-      ### {{ (m.temat or '') | trim }}
+    content: '{% set m = (state_attr(''sensor.librus_imie_nazwisko_wiadomosci'',''wiadomosci'') or [])[0] | default({}, true) %}### {{ (m.temat or '''') | trim }}
 
-      <small>{{ (m.nadawca or '').split(' (')[0] | trim }} · {{ (m.data or '')[:16] }}{{ ' · 📎 załącznik (otwórz w Librusie)' if m.ma_zalacznik else '' }}</small>
+      <small>{{ (m.nadawca or '''').split('' ('')[0] | trim }} · {{ (m.data or '''')[:16] }}{{ '' · 📎 załącznik (otwórz w Librusie)'' if m.ma_zalacznik else '''' }}</small>
+
 
       ---
 
-      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}'
+- type: custom:bubble-card
+  card_type: pop-up
+  hash: '#librus-2'
+  name: Wiadomość
+  icon: mdi:email-open-outline
+  popup_mode: adaptive-dialog
+  width_desktop: 560px
+  open_action:
+    action: perform-action
+    perform_action: librus_apix.otworz_wiadomosc
+    data:
+      entity_id: sensor.librus_imie_nazwisko_wiadomosci
+      numer: 2
+  cards:
+  - type: markdown
+    content: '{% set m = (state_attr(''sensor.librus_imie_nazwisko_wiadomosci'',''wiadomosci'') or [])[1] | default({}, true) %}### {{ (m.temat or '''') | trim }}
+
+      <small>{{ (m.nadawca or '''').split('' ('')[0] | trim }} · {{ (m.data or '''')[:16] }}{{ '' · 📎 załącznik (otwórz w Librusie)'' if m.ma_zalacznik else '''' }}</small>
+
+
+      ---
+
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}'
+- type: custom:bubble-card
+  card_type: pop-up
+  hash: '#librus-3'
+  name: Wiadomość
+  icon: mdi:email-open-outline
+  popup_mode: adaptive-dialog
+  width_desktop: 560px
+  open_action:
+    action: perform-action
+    perform_action: librus_apix.otworz_wiadomosc
+    data:
+      entity_id: sensor.librus_imie_nazwisko_wiadomosci
+      numer: 3
+  cards:
+  - type: markdown
+    content: '{% set m = (state_attr(''sensor.librus_imie_nazwisko_wiadomosci'',''wiadomosci'') or [])[2] | default({}, true) %}### {{ (m.temat or '''') | trim }}
+
+      <small>{{ (m.nadawca or '''').split('' ('')[0] | trim }} · {{ (m.data or '''')[:16] }}{{ '' · 📎 załącznik (otwórz w Librusie)'' if m.ma_zalacznik else '''' }}</small>
+
+
+      ---
+
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}'
+- type: custom:bubble-card
+  card_type: pop-up
+  hash: '#librus-4'
+  name: Wiadomość
+  icon: mdi:email-open-outline
+  popup_mode: adaptive-dialog
+  width_desktop: 560px
+  open_action:
+    action: perform-action
+    perform_action: librus_apix.otworz_wiadomosc
+    data:
+      entity_id: sensor.librus_imie_nazwisko_wiadomosci
+      numer: 4
+  cards:
+  - type: markdown
+    content: '{% set m = (state_attr(''sensor.librus_imie_nazwisko_wiadomosci'',''wiadomosci'') or [])[3] | default({}, true) %}### {{ (m.temat or '''') | trim }}
+
+      <small>{{ (m.nadawca or '''').split('' ('')[0] | trim }} · {{ (m.data or '''')[:16] }}{{ '' · 📎 załącznik (otwórz w Librusie)'' if m.ma_zalacznik else '''' }}</small>
+
+
+      ---
+
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}'
+- type: custom:bubble-card
+  card_type: pop-up
+  hash: '#librus-5'
+  name: Wiadomość
+  icon: mdi:email-open-outline
+  popup_mode: adaptive-dialog
+  width_desktop: 560px
+  open_action:
+    action: perform-action
+    perform_action: librus_apix.otworz_wiadomosc
+    data:
+      entity_id: sensor.librus_imie_nazwisko_wiadomosci
+      numer: 5
+  cards:
+  - type: markdown
+    content: '{% set m = (state_attr(''sensor.librus_imie_nazwisko_wiadomosci'',''wiadomosci'') or [])[4] | default({}, true) %}### {{ (m.temat or '''') | trim }}
+
+      <small>{{ (m.nadawca or '''').split('' ('')[0] | trim }} · {{ (m.data or '''')[:16] }}{{ '' · 📎 załącznik (otwórz w Librusie)'' if m.ma_zalacznik else '''' }}</small>
+
+
+      ---
+
+
+      {% if m.tresc %}{{ m.tresc }}{% else %}⏳ Pobieram treść z Librusa…{% endif %}'
 ```
+
+</details>
 
 ### Karta terminarza (wszystkie zdarzenia)
 
