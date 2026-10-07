@@ -564,6 +564,7 @@ Wielkie podziękowania dla **@jarecki** za wsparcie kodu w Pull Request #9, co p
 Dzięki dla **@sgurgul** za celne zgłoszenia (Issue #12, #13, #14) i cenne sugestie optymalizacyjne, które weszły w skład wersji 2.2.1!
 Ogromne podziękowania dla **@ebabaj** za nieoceniony wkład w rozwój integracji i naprawę zajęć ZŚK (PR #20)!
 Wielkie dzięki również dla **@Lucaspog** za świetny pomysł i przygotowanie podwalin pod komentarze do ocen (PR #21)!
+Szczególne podziękowania dla **@morbiasz** za wdrożenie procentowego wskaźnika frekwencji i dodanie nowych kart ze zrealizowanymi lekcjami (PR #27)!
 
 ## 👨‍💻 Autorzy i podziękowania
 
