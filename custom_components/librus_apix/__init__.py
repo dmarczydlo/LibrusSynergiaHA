@@ -8,7 +8,9 @@ from typing import Dict, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, ServiceCall
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.helpers import entity_registry as er
 from homeassistant.const import CONF_USERNAME, CONF_PASSWORD
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers import config_validation as cv
@@ -130,6 +132,9 @@ class LibrusApiClient:
         self._client: Client = None
         self._token = None
         self._auth_lock = asyncio.Lock()
+        # Tresc wiadomosci otwartych przez akcje otworz_wiadomosc (href -> tresc).
+        # Trzymana w pamieci, zeby przetrwala odswiezenie co 2 h; ginie przy restarcie HA.
+        self.message_contents: Dict[str, str] = {}
 
     def _reset_auth(self) -> None:
         """Reset authentication state to force re-authentication on next call."""
@@ -319,7 +324,9 @@ class LibrusApiClient:
                         "unread": msg.unread,
                         "has_attachment": msg.has_attachment,
                     }
-                    if fetch_content:
+                    if msg.href in self.message_contents:
+                        msg_dict["content"] = self.message_contents[msg.href]
+                    elif fetch_content:
                         try:
                             msg_data = await loop.run_in_executor(None, message_content, client, msg.href)
                             content_str = msg_data.content if hasattr(msg_data, 'content') else str(msg_data)
@@ -349,6 +356,31 @@ class LibrusApiClient:
                 self._reset_auth()
                 if attempt == 1:
                     return None
+
+    async def async_get_message_content(self, href: str):
+        """Pobierz tresc jednej wiadomosci. Librus oznacza ja wtedy jako przeczytana."""
+        for attempt in range(2):
+            try:
+                if not self._client or not self._token:
+                    if not await self.async_authenticate():
+                        return None
+                from librus_apix.messages import message_content
+
+                loop = asyncio.get_running_loop()
+                msg_data = await loop.run_in_executor(None, message_content, self._client, href)
+                content = msg_data.content.replace("\n", "<br>")
+                self.message_contents[href] = content
+                return content
+            except TokenError:
+                _LOGGER.debug("Token expired fetching message content (attempt %d/2)", attempt + 1)
+                self._reset_auth()
+            except Exception as ex:
+                _LOGGER.error(
+                    "Failed to get message content (attempt %d/2): %s\n%s",
+                    attempt + 1, ex, traceback.format_exc(),
+                )
+                self._reset_auth()
+        return None
 
     async def async_get_homework(self):
         """Get upcoming homework assignments from Librus (next 30 days)."""
@@ -1023,6 +1055,35 @@ async def async_setup(hass: HomeAssistant, config: Dict[str, Any]) -> bool:
     """Set up the Librus APIX component."""
     hass.data.setdefault(DOMAIN, {})
     
+    async def _otworz_wiadomosc(call: ServiceCall) -> None:
+        entity = er.async_get(hass).async_get(call.data["entity_id"])
+        client = hass.data[DOMAIN].get(entity.config_entry_id) if entity else None
+        if client is None:
+            raise ServiceValidationError(
+                f"{call.data['entity_id']} nie jest sensorem wiadomosci Librus"
+            )
+        msgs = (client.coordinator.data or {}).get("wiadomosci", [])
+        numer = call.data["numer"]
+        if numer > len(msgs):
+            raise ServiceValidationError(f"Brak wiadomosci nr {numer}")
+        msg = msgs[numer - 1]
+        content = await client.async_get_message_content(msg["href"])
+        if content is None:
+            raise HomeAssistantError("Nie udalo sie pobrac tresci wiadomosci z Librusa")
+        msg["content"] = content
+        msg["unread"] = False
+        client.coordinator.async_set_updated_data(client.coordinator.data)
+
+    hass.services.async_register(
+        DOMAIN,
+        "otworz_wiadomosc",
+        _otworz_wiadomosc,
+        schema=vol.Schema({
+            vol.Required("entity_id"): cv.entity_id,
+            vol.Required("numer"): vol.All(vol.Coerce(int), vol.Range(min=1, max=5)),
+        }),
+    )
+
     if DOMAIN in config:
         username = config[DOMAIN][CONF_USERNAME]
         password = config[DOMAIN][CONF_PASSWORD]

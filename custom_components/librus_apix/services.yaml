@@ -1,0 +1,14 @@
+otworz_wiadomosc:
+  fields:
+    entity_id:
+      required: true
+      selector:
+        entity:
+          integration: librus_apix
+          domain: sensor
+    numer:
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 5

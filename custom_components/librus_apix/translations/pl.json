@@ -29,5 +29,21 @@
         }
       }
     }
+  },
+  "services": {
+    "otworz_wiadomosc": {
+      "name": "Otwórz wiadomość",
+      "description": "Pobiera treść jednej wiadomości z Librusa i pokazuje ją w atrybucie tresc. Librus oznaczy ją jako przeczytaną.",
+      "fields": {
+        "entity_id": {
+          "name": "Sensor wiadomości",
+          "description": "Sensor Wiadomosci ucznia."
+        },
+        "numer": {
+          "name": "Numer",
+          "description": "Pozycja wiadomości na liście (1 = najnowsza)."
+        }
+      }
+    }
   }
 }

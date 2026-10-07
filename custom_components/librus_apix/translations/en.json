@@ -29,5 +29,21 @@
         }
       }
     }
+  },
+  "services": {
+    "otworz_wiadomosc": {
+      "name": "Open message",
+      "description": "Fetches the content of one Librus message into the tresc attribute. Librus marks it as read.",
+      "fields": {
+        "entity_id": {
+          "name": "Messages sensor",
+          "description": "The student's Wiadomosci sensor."
+        },
+        "numer": {
+          "name": "Number",
+          "description": "Position in the message list (1 = newest)."
+        }
+      }
+    }
   }
 }
