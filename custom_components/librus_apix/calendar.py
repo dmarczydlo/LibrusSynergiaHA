@@ -158,16 +158,19 @@ class LibrusScheduleCalendar(CoordinatorEntity, CalendarEntity):
         if not events:
             return None
             
-        today = date.today()
-        future_events = [e for e in events if e.start >= today]
+        now = datetime.now(zoneinfo.ZoneInfo("Europe/Warsaw"))
+        future_events = [e for e in events if e.start_datetime_local >= now]
         if future_events:
-            return sorted(future_events, key=lambda e: e.start)[0]
+            return sorted(future_events, key=lambda e: e.start_datetime_local)[0]
         return None
 
     def _get_events(self) -> List[CalendarEvent]:
         events = []
         data = self.coordinator.data or {}
         terminarz = data.get("terminarz", [])
+        
+        plan = data.get("plan_lekcji", [])
+        tz = zoneinfo.ZoneInfo("Europe/Warsaw")
         
         for ev in terminarz:
             try:
@@ -177,6 +180,23 @@ class LibrusScheduleCalendar(CoordinatorEntity, CalendarEntity):
                     
                 dt_start = datetime.strptime(ev_data, "%Y-%m-%d").date()
                 dt_end = dt_start + timedelta(days=1)
+                is_all_day = True
+                
+                numer_lekcji = ev.get("numer_lekcji")
+                if numer_lekcji and numer_lekcji != "unknown":
+                    # Szukamy godziny lekcji w planie
+                    for day in plan:
+                        if day.get("data") == ev_data:
+                            for lekcja in day.get("lekcje", []):
+                                if str(lekcja.get("numer")) == str(numer_lekcji):
+                                    godzina_od = lekcja.get("godzina_od")
+                                    godzina_do = lekcja.get("godzina_do")
+                                    if godzina_od and godzina_do and "??" not in godzina_od and "??" not in godzina_do:
+                                        dt_start = datetime.strptime(f"{ev_data} {godzina_od}", "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+                                        dt_end = datetime.strptime(f"{ev_data} {godzina_do}", "%Y-%m-%d %H:%M").replace(tzinfo=tz)
+                                        is_all_day = False
+                                    break
+                            break
                 
                 przedmiot = ev.get("przedmiot", "")
                 tytul = ev.get("tytul", "")
@@ -206,9 +226,7 @@ class LibrusScheduleCalendar(CoordinatorEntity, CalendarEntity):
         self, hass: HomeAssistant, start_date: datetime, end_date: datetime
     ) -> List[CalendarEvent]:
         events = self._get_events()
-        start_d = start_date.date()
-        end_d = end_date.date()
         return [
             e for e in events 
-            if e.start >= start_d and e.start < end_d
+            if e.start_datetime_local >= start_date and e.start_datetime_local < end_date
         ]

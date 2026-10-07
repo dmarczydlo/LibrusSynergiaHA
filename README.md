@@ -25,7 +25,7 @@ Integracja tworzy następujące sensory:
 | `sensor.librus_szczesliwy_numerek` | Szczęśliwy numerek dnia | numer |
 | `sensor.librus_oceny` | Wszystkie oceny bieżącego semestru | liczba ocen |
 | `sensor.librus_srednia_ocen` | **Globalna średnia** ze wszystkich przedmiotów | float (wykres 📈) |
-| `sensor.librus_wiadomosci` | Ostatnie 5 wiadomości z pełną treścią | liczba nieprzeczytanych |
+| `sensor.librus_wiadomosci` | Ostatnie wiadomości (domyślnie 10, konfigurowalne do 25 w opcjach) | liczba nieprzeczytanych |
 | `sensor.librus_<przedmiot>` | Oceny z danego przedmiotu (np. `sensor.librus_matematyka`) | lista ocen: "4, 3+, 5" |
 | `sensor.librus_srednia_<przedmiot>` | **Średnia** z danego przedmiotu (np. `sensor.librus_srednia_matematyka`) | float (wykres 📈) |
 | `sensor.librus_plan_lekcji` | Plan lekcji na pełne 7 dni z rozbiciem na dni tygodnia | - |

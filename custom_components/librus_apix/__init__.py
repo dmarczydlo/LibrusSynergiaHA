@@ -297,7 +297,14 @@ class LibrusApiClient:
                 from librus_apix.messages import get_received, message_content
 
                 loop = asyncio.get_running_loop()
-                messages = await loop.run_in_executor(None, get_received, client, 0)
+                messages = []
+                page = 0
+                while len(messages) < count:
+                    page_msgs = await loop.run_in_executor(None, get_received, client, page)
+                    if not page_msgs:
+                        break
+                    messages.extend(page_msgs)
+                    page += 1
                 messages = messages[:count] if messages else []
                 
                 fetch_content = self.options.get("fetch_messages_content", False)

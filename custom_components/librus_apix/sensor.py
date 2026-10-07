@@ -184,7 +184,8 @@ class LibrusDataUpdateCoordinator(DataUpdateCoordinator):
         try:
             student_info = await self.client.async_get_student_information()
             grades = await self.client.async_get_grades()
-            messages = await self.client.async_get_messages(count=10)
+            messages_count = self.client.options.get("fetch_messages_count", 10)
+            messages = await self.client.async_get_messages(count=messages_count)
             homework_raw = await self.client.async_get_homework()
             schedule_raw = await self.client.async_get_schedule()
             plan_lekcji_raw = await self.client.async_get_timetable()

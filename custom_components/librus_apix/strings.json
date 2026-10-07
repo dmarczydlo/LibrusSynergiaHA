@@ -24,6 +24,7 @@
         "title": "Ustawienia Librus APIX",
         "description": "Skonfiguruj dodatkowe opcje działania integracji.",
         "data": {
+          "fetch_messages_count": "Number of messages to fetch from Librus (max 25)",
           "fetch_messages_content": "Pobieraj pełną treść wiadomości (Oznacza je jako przeczytane w systemie Librus!)"
         }
       }

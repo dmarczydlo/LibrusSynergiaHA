@@ -98,6 +98,10 @@ class LibrusApixOptionsFlowHandler(config_entries.OptionsFlow):
         schema = vol.Schema(
             {
                 vol.Optional(
+                    "fetch_messages_count",
+                    default=self.entry.options.get("fetch_messages_count", 10),
+                ): vol.All(vol.Coerce(int), vol.Range(min=1, max=25)),
+                vol.Optional(
                     "fetch_messages_content",
                     default=self.entry.options.get("fetch_messages_content", False),
                 ): bool,

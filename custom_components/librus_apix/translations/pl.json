@@ -24,6 +24,7 @@
         "title": "Ustawienia Librus APIX",
         "description": "Skonfiguruj dodatkowe opcje działania integracji.",
         "data": {
+          "fetch_messages_count": "Liczba pobieranych wiadomości z Librusa (im więcej, tym integracja dłużej się uruchamia, zalecane ok. 10, max 25)",
           "fetch_messages_content": "Pobieraj pełną treść wiadomości (Oznacza je jako przeczytane w systemie Librus!)"
         }
       }

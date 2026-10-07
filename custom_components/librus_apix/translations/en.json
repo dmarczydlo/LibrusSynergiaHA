@@ -24,6 +24,7 @@
         "title": "Librus APIX Settings",
         "description": "Configure additional options for the integration.",
         "data": {
+          "fetch_messages_count": "Number of messages to fetch from Librus (higher number slows down startup, recommended ~10, max 25)",
           "fetch_messages_content": "Fetch full message content (Marks them as read in Librus system!)"
         }
       }
